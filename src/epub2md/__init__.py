@@ -105,6 +105,14 @@ def _find_spine(root):
     if href and "html" in mt: items.append(unquote(href))
   return opf.parent, items
 
+def _chapter_filename(title: str, index: int) -> str:
+  safe = re.sub(r"[^\w\-]+", "-", title.strip(), flags=re.UNICODE)
+  safe = re.sub(r"-+", "-", safe).strip("-")
+  if not safe:
+    safe = "untitled"
+  return f"{index:02d}-{safe}.md"
+
+
 def _extract_title(path):
   try: text = path.read_text(encoding="utf-8", errors="ignore")
   except OSError: return None
@@ -210,8 +218,7 @@ def main():
         snippet = _extract_segment(text, ch["start_id"], ch["end_id"])
 
       n += 1
-      safe = re.sub(r"[^a-z0-9]+", "-", ch["title"].lower()).strip("-")[:60].rstrip("-") or "untitled"
-      name = out / f"{n:02d}-{safe}.md"
+      name = out / _chapter_filename(ch["title"], n)
       inp = ["-"] if snippet else [ch["src"]]
 
       r = subprocess.run(
