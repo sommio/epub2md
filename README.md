@@ -13,6 +13,8 @@ pip install epub2md
 ```bash
 epub2md book.epub          # Creates book/*.md and book/images/
 epub2md book.epub output   # Creates output/*.md and output/images/
+
+Chapter filenames preserve original titles (including Unicode/CJK).
 ```
 
 Output:
