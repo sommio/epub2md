@@ -106,8 +106,8 @@ def _find_spine(root):
   return opf.parent, items
 
 def _chapter_filename(title: str, index: int) -> str:
-  safe = re.sub(r"[^\w\-]+", "-", title.strip(), flags=re.UNICODE)
-  safe = re.sub(r"-+", "-", safe).strip("-")
+  safe = re.sub(r"[^\w\-]+", "-", title.strip())
+  safe = re.sub(r"-+", "-", safe).strip("-")[:80].rstrip("-")
   if not safe:
     safe = "untitled"
   return f"{index:02d}-{safe}.md"
