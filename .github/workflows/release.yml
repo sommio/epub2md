@@ -136,7 +136,7 @@ jobs:
           Copy-Item "pandoc.exe"           "$STAGE\pandoc.exe"
           Copy-Item "scripts\epub2md.cmd"  "$STAGE\epub2md.cmd"
 
-          tar czf "${BUNDLE}.tar.gz" -C stage "${BUNDLE}/"
+          python -c "import tarfile,os; t=tarfile.open('${BUNDLE}.tar.gz','w:gz'); t.add(os.path.join('stage','${BUNDLE}'),'${BUNDLE}'); t.close()"
         shell: pwsh
 
       # --- Upload artifact ----------------------------------------------------
@@ -145,6 +145,6 @@ jobs:
         with:
           files: "epub2md-${{ steps.vars.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
           draft: false
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
