@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-import sys, re, subprocess, tempfile, shutil
+import sys, re, subprocess, tempfile, shutil, zipfile
 from collections import defaultdict
 from urllib.parse import unquote
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+__version__ = "0.2.2"
 
 LUA = """
 function Div(el) return el.content end
@@ -139,6 +141,9 @@ def _extract_segment(text, start_id, end_id):
   return text[start:end] if start < end else None
 
 def main():
+  if "--version" in sys.argv:
+    print(f"epub2md {__version__}")
+    sys.exit(0)
   if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
     print("epub2md - Convert EPUB to Markdown\n\nUsage: epub2md <book.epub> [outdir]\n\nOutput:\n  <outdir>/*.md: Markdown files\n  <outdir>/images/: Images")
     sys.exit(0)
@@ -156,7 +161,8 @@ def main():
 
   with tempfile.TemporaryDirectory() as tmp:
     t = Path(tmp)
-    subprocess.run(["unzip", "-q", str(epub), "-d", str(t)], check=True)
+    try: zipfile.ZipFile(epub).extractall(t)
+    except (zipfile.BadZipFile, zipfile.LargeZipFile, OSError) as e: sys.exit(f"Error: cannot extract {epub.name}: {e}")
     (t / "f.lua").write_text(LUA)
 
     base_dir, items = _find_toc(t)

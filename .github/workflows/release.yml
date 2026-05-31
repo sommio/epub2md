@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  PANDOC_VERSION: "3.9.0.2"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: darwin
+            arch: arm64
+            runner: macos-14
+            pandoc_arch: arm64
+          - os: darwin
+            arch: x86_64
+            runner: macos-13
+            pandoc_arch: x86_64
+          - os: linux
+            arch: x86_64
+            runner: ubuntu-latest
+            pandoc_arch: amd64
+          - os: linux
+            arch: aarch64
+            runner: ubuntu-24.04-arm
+            pandoc_arch: arm64
+          - os: windows
+            arch: x86_64
+            runner: windows-latest
+            pandoc_arch: x86_64
+
+    runs-on: ${{ matrix.runner }}
+    name: build (${{ matrix.os }}-${{ matrix.arch }})
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # --- Python 3.12 -------------------------------------------------------
+      - name: Setup Python 3.12
+        id: setup-python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+        continue-on-error: true
+
+      - name: Install Python 3.12 (fallback for ARM runners)
+        if: steps.setup-python.outcome == 'failure'
+        run: |
+          sudo add-apt-repository -y ppa:deadsnakes/ppa
+          sudo apt-get update
+          sudo apt-get install -y python3.12 python3.12-venv python3.12-dev
+          sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+      # --- Build --------------------------------------------------------------
+      - name: Install + build binary (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install . pyinstaller
+          .venv/bin/python scripts/build.py
+
+      - name: Install + build binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\pip.exe install . pyinstaller
+          .\.venv\Scripts\python.exe scripts\build.py
+        shell: pwsh
+
+      - name: Set build output vars
+        id: vars
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "bundle=epub2md-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      # --- Pandoc -------------------------------------------------------------
+      - name: Download pandoc (Linux)
+        if: matrix.os == 'linux'
+        run: |
+          curl -sL "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-linux-${{ matrix.pandoc_arch }}.tar.gz" \
+            | tar xz --strip-components=2 "pandoc-${PANDOC_VERSION}/bin/pandoc"
+        shell: bash
+
+      - name: Download pandoc (macOS)
+        if: matrix.os == 'darwin'
+        run: |
+          curl -sL "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/pandoc-${PANDOC_VERSION}-${{ matrix.pandoc_arch }}-macOS.zip" -o pandoc.zip
+          unzip -q pandoc.zip
+          mv "pandoc-${PANDOC_VERSION}-${{ matrix.pandoc_arch }}/bin/pandoc" pandoc
+          rm -rf pandoc.zip "pandoc-${PANDOC_VERSION}-${{ matrix.pandoc_arch }}"
+        shell: bash
+
+      - name: Download pandoc (Windows)
+        if: matrix.os == 'windows'
+        run: |
+          $zipName = "pandoc-${env:PANDOC_VERSION}-windows-${{ matrix.pandoc_arch }}.zip"
+          Invoke-WebRequest -Uri "https://github.com/jgm/pandoc/releases/download/${env:PANDOC_VERSION}/${zipName}" -OutFile pandoc.zip
+          Expand-Archive -Path pandoc.zip -DestinationPath .
+          Move-Item "pandoc-${env:PANDOC_VERSION}/pandoc.exe" pandoc.exe
+          Remove-Item -Recurse -Force "pandoc-${env:PANDOC_VERSION}", pandoc.zip
+        shell: pwsh
+
+      # --- Bundle assembly ----------------------------------------------------
+      - name: Assemble bundle (Unix)
+        if: matrix.os != 'windows'
+        run: |
+          BUNDLE="${{ steps.vars.outputs.bundle }}"
+          STAGE="stage/${BUNDLE}/bin"
+          mkdir -p "$STAGE"
+
+          cp dist/epub2md-bin   "$STAGE/epub2md-bin"
+          cp pandoc             "$STAGE/pandoc"
+          cp scripts/epub2md.sh "$STAGE/epub2md"
+          chmod +x "$STAGE"/*
+
+          tar czf "${BUNDLE}.tar.gz" -C stage "${BUNDLE}/"
+        shell: bash
+
+      - name: Assemble bundle (Windows)
+        if: matrix.os == 'windows'
+        run: |
+          $BUNDLE = "${{ steps.vars.outputs.bundle }}"
+          $STAGE  = "stage\${BUNDLE}\bin"
+          New-Item -ItemType Directory -Path $STAGE -Force | Out-Null
+
+          Copy-Item "dist\epub2md-bin.exe" "$STAGE\epub2md-bin.exe"
+          Copy-Item "pandoc.exe"           "$STAGE\pandoc.exe"
+          Copy-Item "scripts\epub2md.cmd"  "$STAGE\epub2md.cmd"
+
+          tar czf "${BUNDLE}.tar.gz" -C stage "${BUNDLE}/"
+        shell: pwsh
+
+      # --- Upload artifact ----------------------------------------------------
+      - name: Upload release asset
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          files: "epub2md-${{ steps.vars.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
+          draft: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -10,7 +10,7 @@ dependencies = []
 epub2md = "epub2md:main"
 
 [project.urls]
-Repository = "https://github.com/mefengl/epub2md"
+Repository = "https://github.com/sommio/epub2md"
 
 [build-system]
 requires = ["uv_build>=0.9.9,<0.10.0"]
