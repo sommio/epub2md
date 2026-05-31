@@ -5,7 +5,7 @@ Convert EPUB to clean Markdown chapters.
 ## Install
 
 ```bash
-pip install epub2md
+mise use github:sommio/epub2md
 ```
 
 ## Usage
@@ -29,8 +29,7 @@ book/
 
 ## Requirements
 
-- Python 3.8+
-- [pandoc](https://pandoc.org/installing.html)
+None. Pandoc is bundled.
 
 ## License
 
