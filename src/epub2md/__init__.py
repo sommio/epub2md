@@ -5,7 +5,7 @@ from urllib.parse import unquote
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 LUA = """
 function Div(el) return el.content end
