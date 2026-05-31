@@ -5,7 +5,7 @@ Convert EPUB to clean Markdown chapters.
 ## Install
 
 ```bash
-mise use github:sommio/epub2md
+mise use github:sommio/epub2md -g
 ```
 
 ## Usage
